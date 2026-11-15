@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DAG 任务调度平台</title>
+<style>
+:root {
+  --bg: #f5f7fa; --panel: #ffffff; --ink: #1c2430; --muted: #6b7787;
+  --line: #dde3ec; --brand: #2563eb; --brand-weak: #dbe7ff;
+  --ok: #16a34a; --run: #d97706; --pend: #64748b; --fail: #dc2626;
+  --upfail: #9333ea; --kill: #475569; --warn: #ca8a04;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f141b; --panel: #171e29; --ink: #e5ebf3; --muted: #93a1b3;
+    --line: #283241; --brand: #60a5fa; --brand-weak: #1e2c45;
+    --ok: #4ade80; --run: #fbbf24; --pend: #94a3b8; --fail: #f87171;
+    --upfail: #c084fc; --kill: #94a3b8; --warn: #facc15;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.5 system-ui, "Segoe UI", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--ink); }
+header { display: flex; align-items: center; gap: 16px; padding: 10px 18px; background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
+header h1 { font-size: 16px; margin: 0; }
+nav { display: flex; gap: 4px; flex-wrap: wrap; }
+nav button { border: 1px solid transparent; background: transparent; color: var(--muted); padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+nav button.active { background: var(--brand-weak); color: var(--brand); font-weight: 600; }
+.spacer { flex: 1; }
+.pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--brand-weak); color: var(--brand); }
+main { padding: 16px 18px; max-width: 1500px; margin: 0 auto; }
+.tab { display: none; }
+.tab.active { display: block; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
+.card h2 { font-size: 14px; margin: 0 0 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; position: sticky; top: 49px; background: var(--panel); }
+tr:hover td { background: color-mix(in srgb, var(--brand-weak) 40%, transparent); }
+.table-wrap { max-height: 70vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+.badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.b-SUCCESS { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.b-RUNNING { background: color-mix(in srgb, var(--run) 18%, transparent); color: var(--run); }
+.b-PENDING { background: color-mix(in srgb, var(--pend) 18%, transparent); color: var(--pend); }
+.b-FAILED { background: color-mix(in srgb, var(--fail) 18%, transparent); color: var(--fail); }
+.b-UPSTREAM_FAILED { background: color-mix(in srgb, var(--upfail) 18%, transparent); color: var(--upfail); }
+.b-KILLED { background: color-mix(in srgb, var(--kill) 18%, transparent); color: var(--kill); }
+.b-SLA_WARNING, .b-RETRY, .b-BACKFLOW_DONE { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.b-SLA_BREACHED, .b-TASK_FAILED, .b-BACKFLOW_FAILED { background: color-mix(in srgb, var(--fail) 18%, transparent); color: var(--fail); }
+input, select, button.btn { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
+button.btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); cursor: pointer; }
+button.btn.primary:hover { filter: brightness(1.08); }
+button.btn.danger { color: var(--fail); border-color: color-mix(in srgb, var(--fail) 40%, var(--line)); cursor: pointer; }
+button.btn { cursor: pointer; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 12px; color: var(--muted); }
+.stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; min-width: 110px; }
+.stat .n { font-size: 22px; font-weight: 700; }
+.stat .l { font-size: 12px; color: var(--muted); }
+#graphWrap { overflow: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+#graphWrap svg { display: block; }
+.node rect { stroke: var(--line); stroke-width: 1; cursor: pointer; }
+.node text { font-size: 9px; pointer-events: none; fill: var(--ink); }
+.edge { stroke: var(--line); stroke-width: 1; fill: none; }
+.edge.hot { stroke: var(--brand); stroke-width: 1.6; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; }
+.muted { color: var(--muted); }
+.mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+#drawer { position: fixed; right: -460px; top: 0; bottom: 0; width: 440px; background: var(--panel); border-left: 1px solid var(--line); box-shadow: -8px 0 24px rgba(0,0,0,.18); transition: right .18s ease; z-index: 20; padding: 16px; overflow: auto; }
+#drawer.open { right: 0; }
+#drawer h3 { margin: 0 0 10px; font-size: 15px; }
+#drawer pre { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; overflow: auto; font-size: 11px; max-height: 240px; }
+.close { float: right; cursor: pointer; color: var(--muted); }
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 10px; font-size: 13px; opacity: 0; transition: opacity .2s; z-index: 30; }
+.toast.show { opacity: .95; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🛠 DAG 任务调度平台</h1>
+  <nav>
+    <button data-tab="graph" class="active">依赖图</button>
+    <button data-tab="tasks">任务定义</button>
+    <button data-tab="instances">运行实例</button>
+    <button data-tab="backfill">补数 / 重跑</button>
+    <button data-tab="alerts">告警</button>
+  </nav>
+  <span class="spacer"></span>
+  <span class="pill" id="tickInfo">—</span>
+</header>
+
+<main>
+  <!-- 依赖图 -->
+  <section class="tab active" id="tab-graph">
+    <div class="card">
+      <h2>依赖图（节点颜色 = 今天分区状态；悬停高亮上下游，点击看详情）</h2>
+      <div class="row" style="margin-bottom:10px">
+        <div class="field"><label>分区日期</label><input type="date" id="graphDate"></div>
+        <button class="btn" id="graphRefresh">刷新</button>
+        <span class="muted" id="graphMeta"></span>
+      </div>
+      <div id="graphWrap"></div>
+      <div class="legend">
+        <span><i style="background:var(--pend)"></i>PENDING</span>
+        <span><i style="background:var(--run)"></i>RUNNING</span>
+        <span><i style="background:var(--ok)"></i>SUCCESS</span>
+        <span><i style="background:var(--fail)"></i>FAILED</span>
+        <span><i style="background:var(--upfail)"></i>UPSTREAM_FAILED</span>
+        <span><i style="background:var(--kill)"></i>KILLED</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 任务定义 -->
+  <section class="tab" id="tab-tasks">
+    <div class="card">
+      <h2>任务定义 <span class="muted" id="taskCount"></span></h2>
+      <div class="table-wrap"><table id="taskTable"><thead><tr>
+        <th>任务</th><th>负责人</th><th>命令</th><th>重试</th><th>预计耗时</th><th>SLA</th><th>上游数</th><th>下游数</th><th>层</th>
+      </tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- 运行实例 -->
+  <section class="tab" id="tab-instances">
+    <div class="card">
+      <h2>运行实例</h2>
+      <div class="row">
+        <div class="field"><label>日期</label><input type="date" id="instDate"></div>
+        <div class="field"><label>状态</label><select id="instStatus">
+          <option value="">全部</option><option>PENDING</option><option>RUNNING</option><option>SUCCESS</option>
+          <option>FAILED</option><option>UPSTREAM_FAILED</option><option>KILLED</option>
+        </select></div>
+        <div class="field"><label>任务名</label><input id="instTask" placeholder="t_000_src"></div>
+        <button class="btn primary" id="instQuery">查询</button>
+      </div>
+    </div>
+    <div class="stats" id="instStats"></div>
+    <div class="card">
+      <div class="table-wrap"><table id="instTable"><thead><tr>
+        <th>ID</th><th>任务</th><th>分区</th><th>状态</th><th>尝试</th><th>入队</th><th>开始</th><th>结束</th><th>耗时</th><th>操作</th>
+      </tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- 补数 -->
+  <section class="tab" id="tab-backfill">
+    <div class="card">
+      <h2>新建补数（按依赖顺序并行，受并发上限约束）</h2>
+      <div class="row">
+        <div class="field"><label>开始日期</label><input type="date" id="bfStart"></div>
+        <div class="field"><label>结束日期</label><input type="date" id="bfEnd"></div>
+        <div class="field"><label>全局并发上限</label><input type="number" id="bfMax" value="64" min="1"></div>
+        <div class="field"><label>单分区并发</label><input type="number" id="bfPerPart" value="32" min="1"></div>
+        <div class="field"><label>并行分区数</label><input type="number" id="bfWindows" value="2" min="1"></div>
+        <button class="btn primary" id="bfSubmit">提交补数</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>一键重跑：任务 + 所有下游（需求 4）</h2>
+      <div class="row">
+        <div class="field"><label>根任务</label><input id="rrTask" placeholder="t_010_lyr1"></div>
+        <div class="field"><label>开始日期</label><input type="date" id="rrStart"></div>
+        <div class="field"><label>结束日期</label><input type="date" id="rrEnd"></div>
+        <button class="btn primary" id="rrSubmit">重跑子树</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>补数记录</h2>
+      <div class="table-wrap"><table id="bfTable"><thead><tr>
+        <th>ID</th><th>日期范围</th><th>根任务</th><th>模式</th><th>并发</th><th>状态</th><th>创建</th><th>完成</th>
+      </tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- 告警 -->
+  <section class="tab" id="tab-alerts">
+    <div class="card">
+      <h2>告警 <label class="muted"><input type="checkbox" id="alertUnacked"> 仅未确认</label></h2>
+      <div class="table-wrap"><table id="alertTable"><thead><tr>
+        <th>ID</th><th>类型</th><th>任务</th><th>分区</th><th>内容</th><th>时间</th><th>状态</th><th></th>
+      </tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+</main>
+
+<div id="drawer"></div>
+<div class="toast" id="toast"></div>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
