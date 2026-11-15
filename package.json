@@ -1,0 +1,28 @@
+{
+  "name": "flowline-scheduler",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Flowline —— 面向数仓的 DAG 分区任务调度系统 (TypeScript / Node.js)",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "tsx src/main.ts",
+    "server": "tsx src/main.ts serve",
+    "cli": "tsx src/main.ts",
+    "test:recovery": "tsx scripts/test-recovery.ts",
+    "test:benchmark": "tsx scripts/benchmark.ts",
+    "test:all": "tsx scripts/test-recovery.ts && tsx scripts/benchmark.ts",
+    "ui:install": "cd ui && npm install",
+    "ui:dev": "cd ui && npm run dev",
+    "ui:build": "cd ui && npm run build"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.4.1",
+    "express": "^5.1.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.5",
+    "@types/node": "^24.0.0"
+  }
+}

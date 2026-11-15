@@ -16,3 +16,12 @@ node_modules/
 __pycache__/
 .venv/
 venv/
+
+# Flowline 运行时数据与构建产物
+data/
+ui/dist/
+dist/
+*.log
+*.db
+*.db-wal
+*.db-shm
